@@ -12,7 +12,7 @@ import java.util.Properties;
 public class Mailer {
 
     private final String username = "tanton.peter@googlemail.com";
-    private final String password = "jicqzyfkpuwpatpi";
+    private final String password = "";
     private final Properties props;
 
     private Session session;
