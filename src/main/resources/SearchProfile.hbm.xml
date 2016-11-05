@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+        "-//Hibernate/Hibernate Mapping DTD//EN"
+        "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping>
+    <class name="tanton.homehunter.domain.hibernate.SearchProfile" table="search_profiles">
+        <meta attribute="class-description">
+            This class contains the property detail.
+        </meta>
+        <id name="profileId" type="int" column="profile_id">
+            <generator class="native"/>
+        </id>
+        <property name="profileType" column="profile_type" type="string"/>
+        <property name="profilePostCode" column="profile_post_code" type="string"/>
+        <property name="profileRadius" column="profile_radius" type="string"/>
+        <property name="minBeds" column="profile_min_beds" type="string"/>
+        <property name="propertyTypeBlacklist" column="property_types_blacklist" type="string"/>
+        <property name="maxPrice" column="profile_max_price" type="string"/>
+    </class>
+</hibernate-mapping>
