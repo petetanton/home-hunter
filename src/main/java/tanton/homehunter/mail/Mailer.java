@@ -1,5 +1,7 @@
 package tanton.homehunter.mail;
 
+import tanton.homehunter.config.EmailConfig;
+
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.PasswordAuthentication;
@@ -11,19 +13,19 @@ import java.util.Properties;
 
 public class Mailer {
 
-    private final String username = "tanton.peter@googlemail.com";
-    private final String password = "";
+    private final EmailConfig emailConfig;
     private final Properties props;
 
     private Session session;
 
 
-    public Mailer() throws MessagingException {
+    public Mailer(final EmailConfig emailConfig) throws MessagingException {
+        this.emailConfig = emailConfig;
         this.props = new Properties();
         props.put("mail.smtp.auth", "true");
         props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.host", "smtp.gmail.com");
-        props.put("mail.smtp.port", "587");
+        props.put("mail.smtp.host", this.emailConfig.getSmtpHost());
+        props.put("mail.smtp.port", this.emailConfig.getSmtpPort());
     }
 
 
@@ -32,7 +34,7 @@ public class Mailer {
             this.session = Session.getInstance(props,
                     new javax.mail.Authenticator() {
                         protected PasswordAuthentication getPasswordAuthentication() {
-                            return new PasswordAuthentication(username, password);
+                            return new PasswordAuthentication(emailConfig.getUsername(), emailConfig.getPassword());
                         }
                     });
         }
@@ -41,7 +43,7 @@ public class Mailer {
 
     public void sendMessage(final String toEmail, final String subject, final String body) throws MessagingException {
         Message message = new MimeMessage(getSession());
-        message.setFrom(new InternetAddress(username));
+        message.setFrom(new InternetAddress(emailConfig.getUsername()));
         message.setRecipients(Message.RecipientType.TO,
                 InternetAddress.parse(toEmail));
         message.setSubject(subject);
