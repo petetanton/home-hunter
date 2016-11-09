@@ -1,7 +1,7 @@
 package tanton.homehunter.util;
 
 
-import tanton.homehunter.domain.hibernate.Listing;
+import tanton.homehunter.domain.dynamo.Listing;
 
 public class HtmlStringBuilder {
 
@@ -15,6 +15,17 @@ public class HtmlStringBuilder {
 //        this.googleApiClient = new GoogleApiClient();
     }
 
+    public HtmlStringBuilder appendDefaultStyles() {
+        this
+                .appendOpenTag("style")
+                .newLine()
+                .indent()
+                .append("body {font-family: Tahoma, Geneva, sans-serif;}")
+                .append("p{width: 50%;}")
+                .appendCloseTag("style");
+        return this;
+    }
+
     public HtmlStringBuilder append(final String append) {
         appendBasicIndent();
         this.sb.append(append);
@@ -25,21 +36,19 @@ public class HtmlStringBuilder {
     public HtmlStringBuilder appendOpenTag(final String tag) {
         appendBasicIndent();
         this.sb.append("<").append(tag).append(">");
-        newLine();
         return this;
     }
 
     public HtmlStringBuilder appendCloseTag(final String tag) {
         appendBasicIndent();
         this.sb.append("</").append(tag).append(">");
-        newLine();
         return this;
     }
 
     public void appendListing(final Listing listing, final Reason reason) {
-        this.sb.append("<h2><a href=\"").append(listing.getDetailsUrl()).append("\">[").append(reason.name()).append("] { £").append(listing.getPrice()).append(" } ").append(listing.getPropertyType()).append(" ").append(listing.getNumBedrooms()).append(" bed(s)</a></h2>")
+        this.sb.append("<li><h2><a href=\"").append(listing.getDetailsUrl()).append("\">[").append(reason.name()).append("] { £").append(listing.getPrice()).append(" } ").append(listing.getPropertyType()).append(" ").append(listing.getNumBedrooms()).append(" bed(s)</a></h2>")
                 .append("<p>").append(listing.getShortDescription()).append("</p>")
-                .append("<img src=\"").append(listing.getImageUrl()).append("\" width=\"50%\" height=\"50%\">\n");
+                .append("<img src=\"").append(listing.getImageUrl()).append("\" width=\"50%\" height=\"50%\"></li>\n");
 
 //                W1A 1AA       NBH
 //                  W12 7TQ        BC
@@ -63,8 +72,9 @@ public class HtmlStringBuilder {
         return this;
     }
 
-    public void newLine() {
+    public HtmlStringBuilder newLine() {
         this.sb.append("\n");
+        return this;
     }
 
     private void appendBasicIndent() {

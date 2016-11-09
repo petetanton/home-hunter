@@ -1,14 +1,12 @@
 package tanton.homehunter.zoopla;
 
 import com.google.gson.Gson;
-import tanton.homehunter.domain.hibernate.Listing;
-import tanton.homehunter.domain.hibernate.PropertyListingResponse;
+import tanton.homehunter.domain.dynamo.Listing;
+import tanton.homehunter.domain.zoopla.PropertyListingResponse;
 import tanton.homehunter.util.HttpClient;
 import tanton.homehunter.util.HttpResponse;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.Date;
 import java.util.List;
 
 public class ZooplaFetcher {
@@ -31,7 +29,7 @@ public class ZooplaFetcher {
         final List<Listing> listings = getPropertyListings(getUrl, 1);
 
         if (listings.size() != 0) {
-            listings.removeIf(x -> x.getLastPublishedDate().before(Date.from(Instant.now().minusMillis(1000 * 60 * 60 * 24 * 7))));
+//            listings.removeIf(x -> x.getLastPublishedDate().before(Date.from(Instant.now().minusMillis(1000 * 60 * 60 * 24 * 7))));
         }
 
         return listings;
