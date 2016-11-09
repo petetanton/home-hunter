@@ -58,8 +58,7 @@ public class Main {
         });
 
 
-
-        processResultDynamo(listings, dynamo, html);
+        final boolean shouldPublish = processResultDynamo(listings, dynamo, html);
 
         html.appendCloseTag("ul").appendCloseTag("body").appendCloseTag("html");
 
@@ -71,10 +70,15 @@ public class Main {
         fw.write(output);
         fw.close();
 
-        s3.putSearch(fileName, file);
-        s3.updateIndex();
+        if (shouldPublish) {
+            s3.putSearch(fileName, file);
+            s3.updateIndex();
 
-        sendMail(mailer, "An update is available", "Please visit https://s3-eu-west-1.amazonaws.com/house-hunting/index.html for more info");
+            sendMail(mailer, "An update is available", "Please visit https://s3-eu-west-1.amazonaws.com/house-hunting/index.html for more info");
+        } else {
+            System.out.println("no updates to publish");
+        }
+
 
 
     }
@@ -91,21 +95,25 @@ public class Main {
     }
 
 
-    private static void processResultDynamo(final List<Listing> listings, final DynamoController dynamo, final HtmlStringBuilder html) {
+    private static boolean processResultDynamo(final List<Listing> listings, final DynamoController dynamo, final HtmlStringBuilder html) {
+        boolean shoudPublish = false;
         html.appendOpenTag("p").append("This list contains updates or new listings").appendCloseTag("p");
         for (Listing listing : listings) {
             final DynamoController.SaveListingStatus saveListingStatus = dynamo.saveListing(listing, "pete.tanton@streamingrocket.com");
             switch (saveListingStatus) {
                 case NEW:
                     html.appendListing(listing, HtmlStringBuilder.Reason.NEW);
+                    shoudPublish = true;
                     continue;
                 case UPDATE:
                     html.appendListing(listing, HtmlStringBuilder.Reason.UPDATE);
+                    shoudPublish = true;
                     continue;
                 default:
                     System.out.println("no change");
             }
         }
+        return shoudPublish;
     }
 
 
