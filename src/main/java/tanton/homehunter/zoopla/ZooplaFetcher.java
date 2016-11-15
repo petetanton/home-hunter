@@ -11,7 +11,7 @@ import java.util.List;
 
 public class ZooplaFetcher {
 
-    private static final String BASE_URL = "http://api.zoopla.co.uk/api/v1/property_listings.js?api_key=b9bhtu9wt2dtyaec4scvzmar&page_size=100&minimum_beds=2&listing_status=sale";
+    private static final String BASE_URL = "http://api.zoopla.co.uk/api/v1/property_listings.js?api_key=key&page_size=100&minimum_beds=2&listing_status=sale";
 
 
     private final Gson gson;
