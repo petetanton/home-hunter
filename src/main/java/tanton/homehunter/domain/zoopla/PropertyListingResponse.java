@@ -1,6 +1,8 @@
-package tanton.homehunter.domain.hibernate;
+package tanton.homehunter.domain.zoopla;
 
 import com.google.gson.annotations.SerializedName;
+import tanton.homehunter.domain.dynamo.Listing;
+import tanton.homehunter.domain.hibernate.BoundingBox;
 
 import java.util.List;
 

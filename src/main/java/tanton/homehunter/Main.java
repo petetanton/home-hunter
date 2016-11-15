@@ -2,16 +2,12 @@ package tanton.homehunter;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.hibernate.Query;
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
+import tanton.homehunter.aws.S3Controller;
 import tanton.homehunter.config.Config;
-import tanton.homehunter.domain.hibernate.Listing;
-import tanton.homehunter.domain.hibernate.SearchProfile;
-import tanton.homehunter.dynamo.DynamoController;
+import tanton.homehunter.domain.dynamo.Listing;
+import tanton.homehunter.domain.dynamo.SearchProfile;
+import tanton.homehunter.aws.DynamoController;
 import tanton.homehunter.mail.Mailer;
-import tanton.homehunter.util.HibernateUtil;
 import tanton.homehunter.util.HtmlStringBuilder;
 import tanton.homehunter.util.HttpClient;
 import tanton.homehunter.zoopla.ZooplaFetcher;
@@ -23,6 +19,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,22 +32,17 @@ public class Main {
         final Config config = getGson().fromJson(readFile("config.json", UTF_8), Config.class);
 
         final Mailer mailer = new Mailer(config.getEmailConfig());
-
-
-        final SessionFactory factory = HibernateUtil.getSessionFactory();
-        final Session readSession = factory.openSession();
-        final Session writeSession = factory.openSession();
+        final DynamoController dynamo = new DynamoController();
+        final S3Controller s3 = new S3Controller();
 
 
         final HttpClient httpClient = new HttpClient();
 
-        StringBuilder snsOut = new StringBuilder();
-
         HtmlStringBuilder html = new HtmlStringBuilder();
         html.appendOpenTag("html").appendOpenTag("head").appendCloseTag("head").appendOpenTag("body")
-                .indent().appendOpenTag("h1").append("Property Results").appendCloseTag("h1");
+                .indent().appendOpenTag("h1").append("Property Results").appendCloseTag("h1").appendOpenTag("ul");
 
-        final List<SearchProfile> searchProfiles = getSearchProfiles(readSession);
+        final List<SearchProfile> searchProfiles = dynamo.getAllSearchProfiles();
 
         final ZooplaFetcher zooplaFetcher = new ZooplaFetcher(getGson(), httpClient);
 
@@ -59,30 +51,33 @@ public class Main {
         searchProfiles.forEach(sp -> {
             try {
                 listings.addAll(zooplaFetcher.getAll(sp.getProfilePostCode(), sp.getProfileRadius(), sp.getMaxPrice()));
+                listings.removeIf(l -> sp.getExcludedListings().contains(l.getListingId()));
             } catch (IOException e) {
                 e.printStackTrace();
             }
         });
 
 
-        processResultHibernate(listings, readSession, writeSession, html);
-//        processResultDynamo(listings, new DynamoController(), html);
+        final boolean shouldPublish = processResultDynamo(listings, dynamo, html);
 
+        html.appendCloseTag("ul").appendCloseTag("body").appendCloseTag("html");
 
-        readSession.close();
-        writeSession.close();
-        factory.close();
-//        if (snsOut.toString().length() > 0)
-//            sns.publish(SNS_ARN, snsOut.toString(), "Property sales");
+        final String fileName = String.valueOf(Instant.now().getEpochSecond()) + ".html";
+        final File file = new File(fileName);
+        FileWriter fw = new FileWriter(file);
 
-
-        FileWriter fw = new FileWriter(new File("out.html"));
         final String output = html.toString();
         fw.write(output);
         fw.close();
 
-        sendMail(mailer, "An update is available", output);
+        if (shouldPublish) {
+            s3.putSearch(fileName, file);
+            s3.updateIndex();
 
+            sendMail(mailer, "An update is available", "Please visit https://s3-eu-west-1.amazonaws.com/house-hunting/index.html for more info");
+        } else {
+            System.out.println("no updates to publish");
+        }
 
 
 
@@ -100,59 +95,27 @@ public class Main {
     }
 
 
-//    private static void processResultDynamo(final List<Listing> listings, final DynamoController dynamo, final HtmlStringBuilder html) {
-//        for (Listing listing : listings) {
-//        }
-//
-//    }
-
-    private static void processResultHibernate(final List<Listing> listings, final Session readSession, final Session writeSession, final HtmlStringBuilder html) {
-//        listings.removeIf(listingIdBlackList::contains);
-        final Transaction readTx = readSession.beginTransaction();
-        final Transaction writeTx = writeSession.beginTransaction();
+    private static boolean processResultDynamo(final List<Listing> listings, final DynamoController dynamo, final HtmlStringBuilder html) {
+        boolean shoudPublish = false;
+        html.appendOpenTag("p").append("This list contains updates or new listings").appendCloseTag("p");
         for (Listing listing : listings) {
-            Query q = readSession.createQuery("from Listing where listing_id = :lid");
-            q.setParameter("lid", listing.getListingId());
-            final List list = q.list();
-            if (list.size() > 0) {
-                final Listing l = (Listing) list.get(0);
-//                System.out.println(String.format("{ %s : %s", l.getFirstPublishedDate().getTime(), listing.getFirstPublishedDate().getTime()));
-                if (l.getFirstPublishedDate().compareTo(listing.getFirstPublishedDate()) != 0 || l.getLastPublishedDate().compareTo(listing.getLastPublishedDate()) != 0) {
+            final DynamoController.SaveListingStatus saveListingStatus = dynamo.saveListing(listing, "pete.tanton@streamingrocket.com");
+            switch (saveListingStatus) {
+                case NEW:
+                    html.appendListing(listing, HtmlStringBuilder.Reason.NEW);
+                    shoudPublish = true;
+                    continue;
+                case UPDATE:
                     html.appendListing(listing, HtmlStringBuilder.Reason.UPDATE);
-//                    notificationService.putListing(listing, NotificationService.Reason.UPDATE);
-                    listing.setId(l.getId());
-
-                    writeSession.saveOrUpdate(listing.getListingId(), listing);
-//                    session.saveOrUpdate(String.valueOf(listing.getId()), listing);
-                }
-            } else {
-                html.appendListing(listing, HtmlStringBuilder.Reason.NEW);
-
-//                notificationService.putListing(listing, NotificationService.Reason.NEW);
-                writeSession.save(listing.getListingId(), listing);
-
+                    shoudPublish = true;
+                    continue;
+                default:
+                    System.out.println("no change");
             }
-
         }
-        readTx.commit();
-        writeTx.commit();
+        return shoudPublish;
     }
 
-    private static List<SearchProfile> getSearchProfiles(final Session session) {
-        final Transaction tx = session.beginTransaction();
-
-        final Query query = session.createQuery("from SearchProfile");
-        final List list = query.list();
-
-        final List<SearchProfile> searchProfiles = new ArrayList<>();
-        for (int i = 0; i < list.size(); i++) {
-            searchProfiles.add((SearchProfile) list.get(i));
-        }
-
-        return searchProfiles;
-
-
-    }
 
 
     private static Gson getGson() {

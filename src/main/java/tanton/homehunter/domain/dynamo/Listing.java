@@ -3,67 +3,87 @@ package tanton.homehunter.domain.dynamo;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
+import com.google.gson.annotations.SerializedName;
 
 import java.util.Date;
 
 @DynamoDBTable(tableName = "home_properties")
-public class DListing {
+public class Listing {
 
     @DynamoDBHashKey(attributeName = "listing_id")
-    private int listingId;
+    @SerializedName(value = "listing_id")
+    private String listingId;
 
     @DynamoDBRangeKey
     private String username;
 
+    @SerializedName(value = "image_caption")
     private String imageCaption;
     private String status;
 
+    @SerializedName(value = "num_floors")
     private String numFloors;
 
+    @SerializedName(value = "listing_status")
     private String listingStatus;
 
+    @SerializedName("num_bedrooms")
     private String numBedrooms;
 
+    @SerializedName(value = "agent_name")
     private String agentName;
     private double latitude;
 
+    @SerializedName(value = "agent_address:")
     private String agentAddress;
 
-
+    @SerializedName(value = "num_recepts")
     private String numRecepts;
 
+    @SerializedName(value = "property_type")
     private String propertyType;
     private String country;
     private double longitude;
 
+    @SerializedName(value = "first_published_date")
     private Date firstPublishedDate;
 
+    @SerializedName(value = "displayable_address")
     private String displayableAddress;
 
+    @SerializedName(value = "price_modifier")
     private String priceModifier;
 
+    @SerializedName(value = "num_bathrooms")
     private String numBathrooms;
 
+    @SerializedName(value = "thumbnail_url")
     private String thumbnailUrl;
     private String description;
 
+    @SerializedName(value = "post_town")
     private String postTown;
 
+    @SerializedName(value = "details_url")
     private String detailsUrl;
 
+    @SerializedName(value = "agent_logo")
     private String agentLogo;
 
+    @SerializedName(value = "short_description")
     private String shortDescription;
 
+    @SerializedName(value = "agent_phone")
     private String agentPhone;
     private String outcode;
 
+    @SerializedName(value = "image_url")
     private String imageUrl;
 
+    @SerializedName(value = "last_published_date")
     private Date lastPublishedDate;
     private String county;
     private String price;
-
 
     public String getAgentAddress() {
         return agentAddress;
@@ -177,11 +197,11 @@ public class DListing {
         this.latitude = latitude;
     }
 
-    public int getListingId() {
+    public String getListingId() {
         return listingId;
     }
 
-    public void setListingId(int listingId) {
+    public void setListingId(String listingId) {
         this.listingId = listingId;
     }
 
