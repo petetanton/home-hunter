@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 public class DynamoController {
     private final DynamoDBMapper mapper;
 
-    private static final int BACKOFF = 2000;
+    private static final int BACKOFF = 10000;
     private static final int MAX_BACKOFF = 60000;
 
     public DynamoController() {
@@ -89,7 +89,7 @@ public class DynamoController {
         return backoff;
     }
 
-    private void saveSearchProfile(final SearchProfile searchProfile) {
+    public void saveSearchProfile(final SearchProfile searchProfile) {
         this.mapper.save(searchProfile);
     }
 

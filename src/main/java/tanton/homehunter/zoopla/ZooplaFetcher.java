@@ -1,6 +1,7 @@
 package tanton.homehunter.zoopla;
 
 import com.google.gson.Gson;
+import tanton.homehunter.config.ZooplaConfig;
 import tanton.homehunter.domain.dynamo.Listing;
 import tanton.homehunter.domain.zoopla.PropertyListingResponse;
 import tanton.homehunter.util.HttpClient;
@@ -11,20 +12,23 @@ import java.util.List;
 
 public class ZooplaFetcher {
 
-    private static final String BASE_URL = "http://api.zoopla.co.uk/api/v1/property_listings.js?api_key=key&page_size=100&minimum_beds=2&listing_status=sale";
+    private final String baseUrl;
 
 
     private final Gson gson;
     private final HttpClient httpClient;
+    private final ZooplaConfig zooplaConfig;
 
-    public ZooplaFetcher(final Gson gson, final HttpClient httpClient) {
+    public ZooplaFetcher(final Gson gson, final HttpClient httpClient, final ZooplaConfig zooplaConfig) {
         this.gson = gson;
         this.httpClient = httpClient;
+        this.zooplaConfig = zooplaConfig;
+        this.baseUrl = "http://api.zoopla.co.uk/api/v1/property_listings.js?api_key=" + zooplaConfig.getApiKey() + "&page_size=100&minimum_beds=2&listing_status=sale";
     }
 
     public List<Listing> getAll(final String postCode, final String radius, final String maxPrice) throws IOException {
 
-        final String getUrl = String.format("%s&postcode=%s&radius=%s&maximum_price=%s", BASE_URL, postCode, radius, maxPrice);
+        final String getUrl = String.format("%s&postcode=%s&radius=%s&maximum_price=%s", baseUrl, postCode, radius, maxPrice);
 
         final List<Listing> listings = getPropertyListings(getUrl, 1);
 

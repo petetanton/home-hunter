@@ -27,9 +27,7 @@ public class HtmlStringBuilder {
     }
 
     public HtmlStringBuilder append(final String append) {
-        appendBasicIndent();
         this.sb.append(append);
-        newLine();
         return this;
     }
 
