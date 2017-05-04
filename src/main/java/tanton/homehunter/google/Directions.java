@@ -1,9 +1,12 @@
 package tanton.homehunter.google;
 
 import com.google.common.collect.ImmutableList;
+import com.google.gson.Gson;
 import com.google.maps.DirectionsApi;
 import com.google.maps.DirectionsApiRequest;
 import com.google.maps.GeoApiContext;
+import com.google.maps.errors.NotFoundException;
+import com.google.maps.errors.OverDailyLimitException;
 import com.google.maps.model.DirectionsLeg;
 import com.google.maps.model.DirectionsResult;
 import com.google.maps.model.DirectionsRoute;
@@ -12,24 +15,32 @@ import org.joda.time.DateTime;
 import tanton.homehunter.config.GoogleConfig;
 import tanton.homehunter.config.google.Place;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class Directions {
 
 
     private final GoogleConfig googleConfig;
     private final GeoApiContext context;
+    private final CommuteDataCache cache;
+
+    private boolean shouldHitGoogle;
 
 
-    public Directions(final GoogleConfig googleConfig) {
+    public Directions(final GoogleConfig googleConfig, final Gson gson) throws IOException {
         this.googleConfig = googleConfig;
         this.context = new GeoApiContext().setApiKey(googleConfig.getApiKey());
+        this.shouldHitGoogle = true;
+        this.cache = new CommuteDataCache(gson, new File(".cache"));
     }
 
-    public Map<String, List<CommuteData>> getRouteData(final String location) {
+    public Map<String, List<CommuteData>> getRouteData(final String location) throws OverDailyLimitException, IOException {
         Map<String, List<CommuteData>> routeData = new HashMap<>();
 
         for (Place place : googleConfig.getPlaces()) {
@@ -38,7 +49,10 @@ public class Directions {
         return routeData;
     }
 
-    private RouteData getFastestRoute(TravelMode travelMode, String start, String destinaion) {
+    public RouteData getFastestRoute(TravelMode travelMode, String start, String destinaion) throws OverDailyLimitException, IOException {
+        if (!shouldHitGoogle) {
+            throw new OverDailyLimitException("Over daily limit");
+        }
         final DirectionsApiRequest directions = DirectionsApi.getDirections(context, start, destinaion);
         final int dayOfWeek = DateTime.now().getDayOfWeek();
         long addDays = 0;
@@ -56,7 +70,19 @@ public class Directions {
 //        directions.transitMode(TransitMode.BUS, TransitMode.RAIL, TransitMode.SUBWAY, TransitMode.TRAIN, TransitMode.TRAM);
         directions.mode(travelMode);
 
-        final DirectionsResult result = getResultWithBackOff(directions, 3, 2000);
+        final Optional<DirectionsResult> apiResponseFromCache = cache.getApiResponseFromCache(travelMode, start, destinaion);
+        final DirectionsResult result;
+        if (apiResponseFromCache.isPresent()) {
+            result = apiResponseFromCache.get();
+        } else {
+            result = getResultWithBackOff(directions, 3, 2000);
+        }
+
+        if (result == null) {
+            return new RouteData(Duration.ofSeconds(0), null);
+        } else {
+            cache.save(result, travelMode, start, destinaion);
+        }
 
         DirectionsRoute fastestRoute = null;
         long fastestTime = 0;
@@ -73,19 +99,19 @@ public class Directions {
         return new RouteData(Duration.ofSeconds(fastestTime), null);
     }
 
-    private DirectionsResult getResultWithBackOff(final DirectionsApiRequest request, int retry, final int backoffTime) {
-        System.out.println(String.format("going around {%s, %s}", retry, backoffTime));
+    private DirectionsResult getResultWithBackOff(final DirectionsApiRequest request, int retry, final int backoffTime) throws OverDailyLimitException {
+//        System.out.println(String.format("going around {%s, %s}", retry, backoffTime));
         retry--;
         try {
 
             return request.await();
+        } catch (NotFoundException e) {
+            System.out.println("Cannot find location");
+            return null;
+        } catch (OverDailyLimitException e) {
+            this.shouldHitGoogle = false;
+            throw e;
         } catch (Exception e) {
-            if (retry > 0) {
-                try {
-                    Thread.sleep(backoffTime);
-                } catch (InterruptedException ignored) {}
-                return getResultWithBackOff(request, retry, backoffTime * 2);
-            }
             throw new RuntimeException(e);
         }
     }

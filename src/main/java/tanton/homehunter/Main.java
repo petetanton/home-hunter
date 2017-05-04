@@ -2,6 +2,7 @@ package tanton.homehunter;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.maps.errors.OverDailyLimitException;
 import tanton.homehunter.aws.DynamoController;
 import tanton.homehunter.aws.S3Controller;
 import tanton.homehunter.config.Config;
@@ -34,8 +35,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class Main {
 
-    private static void google(final GoogleConfig googleConfig) throws Exception {
-        final Directions directions = new Directions(googleConfig);
+    private static void google(final GoogleConfig googleConfig) throws OverDailyLimitException, IOException {
+        final Directions directions = new Directions(googleConfig, getGson());
         for (Map.Entry<String, List<CommuteData>> entry : directions.getRouteData("SW9 0LP").entrySet()) {
             System.out.println(entry.getKey());
             for (CommuteData commuteData : entry.getValue()) {
@@ -45,7 +46,20 @@ public class Main {
         }
     }
 
-    public static void main(final String[] args) throws Exception {
+    public static void main(final String[] args) throws IOException, MessagingException {
+        run();
+//        while (true) {
+//            try {
+//                run();
+//                System.out.println("waiting before running again");
+//                Thread.sleep(15 * 60 * 1000);
+//            } catch (IOException | MessagingException | InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//        }
+    }
+
+    public static void run() throws IOException, MessagingException {
         final Config config = getGson().fromJson(readFile("config.json", UTF_8), Config.class);
 //        google(config.getGoogleConfig());
 //        System.exit(1);
@@ -54,6 +68,8 @@ public class Main {
         final DynamoController dynamo = new DynamoController();
         final S3Controller s3 = new S3Controller();
 
+//        dynamo.deleteAllListings("pete.tanton@streamingrocket.com");
+//        System.exit(1);
 
         final HttpClient httpClient = new HttpClient();
 
@@ -85,7 +101,8 @@ public class Main {
         });
 
 
-        final boolean shouldPublish = processResultDynamo(listings, dynamo, html, new Directions(config.getGoogleConfig()));
+        boolean shouldPublish;
+        shouldPublish = processResultDynamo(listings, dynamo, html, new Directions(config.getGoogleConfig(), getGson()));
 
         html.appendCloseTag("div").append(htmlBodyLast()).appendCloseTag("body").appendCloseTag("html");
 
@@ -120,15 +137,31 @@ public class Main {
 
     }
 
-    private static String generateCommuteData(final Listing listing, final Directions directions) {
+    private static String generateCommuteData(final Listing listing, final Directions directions, final DynamoController dynamo) {
         final StringBuilder sb = new StringBuilder();
-        System.out.println(listing.getDisplayableAddress());
-        for (Map.Entry<String, List<CommuteData>> entry : directions.getRouteData(listing.getDisplayableAddress()).entrySet()) {
-            sb.append("<strong>").append(entry.getKey()).append("</strong>");
-            for (CommuteData commuteData : entry.getValue()) {
-                sb.append("</br>").append(commuteData.getTravelMode().toString()).append(": ").append(commuteData.getRouteData().getDuration()).append("</br>");
-            }
-        }
+//        System.out.println(listing.getDisplayableAddress());
+//        if (listing.getCommuteData() == null || listing.getCommuteData().size() == 0) {
+//            try {
+//                listing.setCommuteData(directions.getRouteData(listing.getDisplayableAddress()));
+//                dynamo.saveListing(listing, "pete.tanton@streamingrocket.com");
+//            } catch (OverDailyLimitException e) {
+//                System.out.println("Cannot get data from google api " + e.getMessage());
+//            } catch (IOException e) {
+//                System.out.println("issue getting google api data");
+//                e.printStackTrace();
+//            }
+//        }
+//
+//        if (listing.getCommuteData() != null && listing.getCommuteData().size() > 0) {
+//            for (Map.Entry<String, List<CommuteData>> entry : listing.getCommuteData().entrySet()) {
+//                sb.append("<strong>").append(entry.getKey()).append("</strong>");
+//                for (CommuteData commuteData : entry.getValue()) {
+//                    sb.append("</br>").append(commuteData.getTravelMode().toString()).append(": ").append(commuteData.getRouteData().getDuration()).append("</br>");
+//                }
+//            }
+//        } else {
+//            sb.append("No commute data available");
+//        }
         return sb.toString();
     }
 
@@ -146,11 +179,11 @@ public class Main {
                     if (typeContentMap.containsKey(listing.getPropertyType())) {
                         sb.append(typeContentMap.get(listing.getPropertyType()));
                         sb.append(generateListingString(listing, HtmlStringBuilder.Reason.NEW));
-                        sb.append("<p>").append(generateCommuteData(listing, directions)).append("</p>");
+                        sb.append("<p>").append(generateCommuteData(listing, directions, dynamo)).append("</p>");
                         typeContentMap.replace(listing.getPropertyType(), sb.toString());
                     } else {
                         sb.append(generateListingString(listing, HtmlStringBuilder.Reason.NEW));
-                        sb.append("<p>").append(generateCommuteData(listing, directions)).append("</p>");
+                        sb.append("<p>").append(generateCommuteData(listing, directions, dynamo)).append("</p>");
                         typeContentMap.put(listing.getPropertyType(), sb.toString());
                     }
                     shoudPublish = true;
@@ -159,11 +192,11 @@ public class Main {
                     if (typeContentMap.containsKey(listing.getPropertyType())) {
                         sb.append(typeContentMap.get(listing.getPropertyType()));
                         sb.append(generateListingString(listing, HtmlStringBuilder.Reason.UPDATE));
-                        sb.append("<p>").append(generateCommuteData(listing, directions)).append("</p>");
+                        sb.append("<p>").append(generateCommuteData(listing, directions, dynamo)).append("</p>");
                         typeContentMap.replace(listing.getPropertyType(), sb.toString());
                     } else {
                         sb.append(generateListingString(listing, HtmlStringBuilder.Reason.UPDATE));
-                        sb.append("<p>").append(generateCommuteData(listing, directions)).append("</p>");
+                        sb.append("<p>").append(generateCommuteData(listing, directions, dynamo)).append("</p>");
                         typeContentMap.put(listing.getPropertyType(), sb.toString());
                     }
                     shoudPublish = true;
@@ -171,6 +204,7 @@ public class Main {
                 default:
                     System.out.println("no change");
             }
+
         }
 
 
@@ -209,9 +243,10 @@ public class Main {
 
         }
         badDescriptionStrings.add("Homewise's lifetime lease plan");
-        badDescriptionStrings.add("Over 55's only");
+        badDescriptionStrings.add("over 55's");
         badDescriptionStrings.add("retirement");
         badDescriptionStrings.add("Auction sale");
+        badDescriptionStrings.add("over 55s");
 
         final List<Listing> badListings = new ArrayList<>();
 

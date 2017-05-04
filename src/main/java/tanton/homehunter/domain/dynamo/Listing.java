@@ -1,14 +1,20 @@
 package tanton.homehunter.domain.dynamo;
 
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.google.gson.annotations.SerializedName;
+import tanton.homehunter.google.CommuteData;
 
 import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 @DynamoDBTable(tableName = "home_properties")
 public class Listing {
+
+//    new_home
 
     @DynamoDBHashKey(attributeName = "listing_id")
     @SerializedName(value = "listing_id")
@@ -84,6 +90,16 @@ public class Listing {
     private Date lastPublishedDate;
     private String county;
     private String price;
+    @DynamoDBAttribute(attributeName = "commute_data")
+    private Map<String, List<CommuteData>> commuteData;
+
+    public Map<String, List<CommuteData>> getCommuteData() {
+        return commuteData;
+    }
+
+    public void setCommuteData(Map<String, List<CommuteData>> commuteData) {
+        this.commuteData = commuteData;
+    }
 
     public String getAgentAddress() {
         return agentAddress;
